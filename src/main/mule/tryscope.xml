@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:snowflake="http://www.mulesoft.org/schema/mule/snowflake" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/snowflake http://www.mulesoft.org/schema/mule/snowflake/current/mule-snowflake.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="2a2b6268-c687-49a5-84c7-6a3ef2b1e32d" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<snowflake:snowflake-config name="Snowflake_Config" doc:name="Snowflake Config" doc:id="4228f3f4-388d-4ab5-b29f-f4b7f1dcb7bf" >
+		<snowflake:snowflake-connection accountName="qh87132.central-india.azure" warehouse="COMPUTE_WH" database="customers1_db" schema="publics2" user="Training" password="Sasidhar@1748400" role="ACCOUNTADMIN" />
+	</snowflake:snowflake-config>
+	<flow name="tryscopeFlow" doc:id="01c34a72-7a4c-4129-9985-d6a88ab95249" >
+		<http:listener doc:name="Listener" doc:id="1b3e58b3-6929-4f37-9d69-9f708fc5495a" config-ref="HTTP_Listener_config" path="api"/>
+		<ee:transform doc:name="Transform Message" doc:id="5b0b22d3-223f-4063-9c3e-761fcc551af4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<try doc:name="Try" doc:id="383e322a-a307-48b8-8d30-6fc9e0a5fb4f">
+				<logger level="INFO" doc:name="Logger" doc:id="f9cbb3e1-d0f9-49ad-a8b2-9a706ee121be" message="#[payload]" />
+				<snowflake:insert doc:name="Insert" doc:id="b4778e24-b8c2-42c3-a929-bae12fd3e9f3" config-ref="Snowflake_Config">
+					<snowflake:sql><![CDATA[Insert into customers_detailss (Id,firstName,lastName,email,phoneNumber,address,city,country,age,status)
+values(:Id,:firstName,:lastName,:email,:phoneNumber,:address,:city,:country,:age,:status)]]></snowflake:sql>
+					<snowflake:input-parameters><![CDATA[#[{
+	"Id": payload.Id,
+	"firstName": payload.firstName,
+	"lastName": payload.lastName,
+	"email":payload.email,
+	"phoneNumber": payload.phoneNumber,
+	"address": payload.address,
+	"city": payload.city,
+	"country": payload.country,
+	"age": payload.age,
+	"status": payload.status
+	
+}]]]></snowflake:input-parameters>
+				</snowflake:insert>
+				<error-handler>
+					<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="9aae857c-9746-4601-97aa-dc5ffefa15bd">
+						<logger level="INFO" doc:name="Logger" doc:id="be1d04f1-0f03-46cd-8a31-9b53bb45b77f" message="#[payload]" />
+						<ee:transform doc:name="Transform Message" doc:id="fa190180-2ab3-4bfe-af18-34f76a11e36d">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "This message is failed"
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+					</on-error-continue>
+				</error-handler>
+			</try>
+		<ee:transform doc:name="Transform Message" doc:id="a11ee92d-099f-49e4-911e-71bdcdb08035">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "data insert successfully"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
